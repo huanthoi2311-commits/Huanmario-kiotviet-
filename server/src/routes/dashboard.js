@@ -10,34 +10,42 @@ function monthBounds(offsetMonths = 0) {
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-router.get("/summary", (req, res) => {
-  const todayRow = db
+router.get("/summary", async (req, res) => {
+  const todayRow = await db
     .prepare(
       `SELECT COALESCE(SUM(total_amount), 0) AS revenue, COUNT(*) AS orders
-       FROM orders WHERE date(date) = date('now') AND status = 'completed'`
+       FROM orders WHERE date::date = CURRENT_DATE AND status = 'completed'`
     )
     .get();
 
   const thisMonth = monthBounds(0);
   const lastMonth = monthBounds(-1);
 
-  const thisMonthRevenue = db
-    .prepare(
-      `SELECT COALESCE(SUM(total_amount), 0) AS revenue FROM orders
-       WHERE date >= ? AND date < ? AND status = 'completed'`
-    )
-    .get(thisMonth.start, thisMonth.end).revenue;
+  const thisMonthRevenue = (
+    await db
+      .prepare(
+        `SELECT COALESCE(SUM(total_amount), 0) AS revenue FROM orders
+         WHERE date >= ?::timestamptz AND date < ?::timestamptz AND status = 'completed'`
+      )
+      .get(thisMonth.start, thisMonth.end)
+  ).revenue;
 
-  const lastMonthRevenue = db
-    .prepare(
-      `SELECT COALESCE(SUM(total_amount), 0) AS revenue FROM orders
-       WHERE date >= ? AND date < ? AND status = 'completed'`
-    )
-    .get(lastMonth.start, lastMonth.end).revenue;
+  const lastMonthRevenue = (
+    await db
+      .prepare(
+        `SELECT COALESCE(SUM(total_amount), 0) AS revenue FROM orders
+         WHERE date >= ?::timestamptz AND date < ?::timestamptz AND status = 'completed'`
+      )
+      .get(lastMonth.start, lastMonth.end)
+  ).revenue;
 
-  const returns = db
-    .prepare(`SELECT COUNT(*) AS c FROM orders WHERE status = 'returned' AND date(returned_at) = date('now')`)
-    .get().c;
+  const returns = (
+    await db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM orders WHERE status = 'returned' AND returned_at::date = CURRENT_DATE`
+      )
+      .get()
+  ).c;
 
   const percentChange =
     lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
@@ -51,16 +59,16 @@ router.get("/summary", (req, res) => {
   });
 });
 
-router.get("/revenue", (req, res) => {
+router.get("/revenue", async (req, res) => {
   const groupBy = req.query.groupBy || "day";
   const { start, end } = monthBounds(0);
 
   if (groupBy === "hour") {
     const dateParam = req.query.date || new Date().toISOString().slice(0, 10);
-    const rows = db
+    const rows = await db
       .prepare(
-        `SELECT strftime('%H', date) AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
-         FROM orders WHERE date(date) = ? AND status = 'completed'
+        `SELECT to_char(date, 'HH24') AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
+         FROM orders WHERE date::date = ?::date AND status = 'completed'
          GROUP BY bucket ORDER BY bucket`
       )
       .all(dateParam);
@@ -68,10 +76,10 @@ router.get("/revenue", (req, res) => {
   }
 
   if (groupBy === "weekday") {
-    const rows = db
+    const rows = await db
       .prepare(
-        `SELECT strftime('%w', date) AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
-         FROM orders WHERE date >= ? AND date < ? AND status = 'completed'
+        `SELECT EXTRACT(DOW FROM date)::int AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
+         FROM orders WHERE date >= ?::timestamptz AND date < ?::timestamptz AND status = 'completed'
          GROUP BY bucket ORDER BY bucket`
       )
       .all(start, end);
@@ -79,19 +87,19 @@ router.get("/revenue", (req, res) => {
     return res.json(rows.map((r) => ({ label: names[Number(r.bucket)], revenue: r.revenue })));
   }
 
-  const rows = db
+  const rows = await db
     .prepare(
-      `SELECT strftime('%d', date) AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
-       FROM orders WHERE date >= ? AND date < ? AND status = 'completed'
+      `SELECT to_char(date, 'DD') AS bucket, COALESCE(SUM(total_amount), 0) AS revenue
+       FROM orders WHERE date >= ?::timestamptz AND date < ?::timestamptz AND status = 'completed'
        GROUP BY bucket ORDER BY bucket`
     )
     .all(start, end);
   res.json(rows.map((r) => ({ label: r.bucket, revenue: r.revenue })));
 });
 
-router.get("/top-products", (req, res) => {
+router.get("/top-products", async (req, res) => {
   const limit = Number(req.query.limit) || 10;
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT p.id, p.name, SUM(oi.qty) AS qty, SUM(oi.qty * oi.price) AS revenue
        FROM order_items oi
@@ -104,11 +112,11 @@ router.get("/top-products", (req, res) => {
   res.json(rows);
 });
 
-router.get("/top-customers", (req, res) => {
+router.get("/top-customers", async (req, res) => {
   const limit = Number(req.query.limit) || 10;
-  const rows = db
+  const rows = await db
     .prepare(
-      `SELECT c.id, c.name, COUNT(o.id) AS orderCount, SUM(o.total_amount) AS spend
+      `SELECT c.id, c.name, COUNT(o.id) AS "orderCount", SUM(o.total_amount) AS spend
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
        WHERE o.status = 'completed'
@@ -118,19 +126,17 @@ router.get("/top-customers", (req, res) => {
   res.json(rows);
 });
 
-router.get("/activity", (req, res) => {
+router.get("/activity", async (req, res) => {
   const limit = Number(req.query.limit) || 10;
-  const rows = db
-    .prepare(`SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?`)
-    .all(limit);
+  const rows = await db.prepare(`SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?`).all(limit);
   res.json(rows);
 });
 
-router.get("/debtors", (req, res) => {
-  const rows = db
+router.get("/debtors", async (req, res) => {
+  const rows = await db
     .prepare(
       `SELECT id, name, debt_amount,
-       CAST(julianday('now') - julianday(created_at) AS INTEGER) AS daysSince
+       (CURRENT_DATE - created_at::date) AS "daysSince"
        FROM customers WHERE debt_amount > 0 ORDER BY debt_amount DESC`
     )
     .all();

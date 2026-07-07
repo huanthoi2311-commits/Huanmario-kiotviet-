@@ -3,3 +3,6 @@ client/dist/
 server/data/*.db
 *.log
 .env
+
+.vercel
+.env*

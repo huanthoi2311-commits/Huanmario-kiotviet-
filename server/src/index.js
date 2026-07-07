@@ -3,7 +3,7 @@ import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import "./db.js";
+import { dbReady } from "./db.js";
 import { requireAuth } from "./middleware/auth.js";
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
@@ -20,6 +20,16 @@ import taxRoutes from "./routes/tax.js";
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use(async (req, res, next) => {
+  try {
+    await dbReady;
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Lỗi khởi tạo cơ sở dữ liệu" });
+  }
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", requireAuth, dashboardRoutes);
@@ -48,5 +58,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Lỗi máy chủ" });
 });
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+export default app;
+
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}

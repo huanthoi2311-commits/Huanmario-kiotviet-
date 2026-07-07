@@ -5,11 +5,11 @@ const router = Router();
 
 const PRESUMPTIVE_TAX_RATE = 0.015; // simplified placeholder, not a substitute for real accounting advice
 
-router.get("/monthly-summary", (req, res) => {
+router.get("/monthly-summary", async (req, res) => {
   const months = Number(req.query.months) || 6;
-  const rows = db
+  const rows = await db
     .prepare(
-      `SELECT strftime('%Y-%m', o.date) AS month,
+      `SELECT to_char(o.date, 'YYYY-MM') AS month,
               COALESCE(SUM(o.total_amount), 0) AS revenue,
               COALESCE(SUM(oi.qty * oi.cost), 0) AS cost
        FROM orders o
