@@ -11,10 +11,9 @@ router.get("/monthly-summary", (req, res) => {
     .prepare(
       `SELECT strftime('%Y-%m', o.date) AS month,
               COALESCE(SUM(o.total_amount), 0) AS revenue,
-              COALESCE(SUM(oi.qty * p.cost), 0) AS cost
+              COALESCE(SUM(oi.qty * oi.cost), 0) AS cost
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
-       JOIN products p ON p.id = oi.product_id
        WHERE o.status = 'completed'
        GROUP BY month ORDER BY month DESC LIMIT ?`
     )

@@ -96,7 +96,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   order_id INTEGER NOT NULL REFERENCES orders(id),
   product_id INTEGER NOT NULL REFERENCES products(id),
   qty INTEGER NOT NULL,
-  price REAL NOT NULL
+  price REAL NOT NULL,
+  cost REAL NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS cashbook_transactions (
@@ -118,6 +119,16 @@ CREATE TABLE IF NOT EXISTS activity_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+
+const orderItemColumns = db.prepare("PRAGMA table_info(order_items)").all();
+if (!orderItemColumns.some((c) => c.name === "cost")) {
+  db.exec("ALTER TABLE order_items ADD COLUMN cost REAL NOT NULL DEFAULT 0");
+  db.exec(
+    `UPDATE order_items SET cost = COALESCE(
+      (SELECT cost FROM products WHERE products.id = order_items.product_id), 0
+    )`
+  );
+}
 
 export function logActivity(type, message, refType = null, refId = null, createdAt = null) {
   db.prepare(
@@ -228,8 +239,9 @@ function seedIfEmpty() {
         const productIdx = rand(0, productDefs.length - 1);
         const qty = rand(1, 5);
         const price = productDefs[productIdx][4];
+        const cost = productDefs[productIdx][5];
         total += qty * price;
-        items.push({ productId: productIds[productIdx], qty, price });
+        items.push({ productId: productIds[productIdx], qty, price, cost });
       }
       const paymentStatus = Math.random() < 0.1 ? "unpaid" : "paid";
       const code = `HD${String(orderCounter).padStart(6, "0")}`;
@@ -245,8 +257,8 @@ function seedIfEmpty() {
 
       for (const it of items) {
         db.prepare(
-          "INSERT INTO order_items (order_id, product_id, qty, price) VALUES (?, ?, ?, ?)"
-        ).run(orderId, it.productId, it.qty, it.price);
+          "INSERT INTO order_items (order_id, product_id, qty, price, cost) VALUES (?, ?, ?, ?, ?)"
+        ).run(orderId, it.productId, it.qty, it.price, it.cost);
       }
 
       const employeeName = employeeDefs.find((_, idx) => employeeIds[idx] === employeeId)[0];

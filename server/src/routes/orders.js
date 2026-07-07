@@ -58,9 +58,10 @@ export function buildOrdersRouter(defaultChannel = null) {
       .lastInsertRowid;
 
     for (const it of items) {
+      const product = db.prepare("SELECT cost FROM products WHERE id = ?").get(it.productId);
       db.prepare(
-        "INSERT INTO order_items (order_id, product_id, qty, price) VALUES (?, ?, ?, ?)"
-      ).run(orderId, it.productId, it.qty, it.price);
+        "INSERT INTO order_items (order_id, product_id, qty, price, cost) VALUES (?, ?, ?, ?, ?)"
+      ).run(orderId, it.productId, it.qty, it.price, product?.cost ?? 0);
       db.prepare("UPDATE products SET stock_qty = stock_qty - ? WHERE id = ?").run(it.qty, it.productId);
     }
 
