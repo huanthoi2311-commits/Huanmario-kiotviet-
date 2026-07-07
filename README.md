@@ -34,6 +34,4 @@ Sau khi deploy, web chạy tại `https://<ten-app-cua-ban>.fly.dev`.
 
 ## Đổi mật khẩu admin
 
-Hiện tài khoản mặc định là `admin` / `admin123` (được seed sẵn trong `server/src/db.js`). Cách đổi:
-1. Xóa dòng seed user hiện tại trong `db.js`, thay bằng mật khẩu mới, sau đó xóa file `server/data/app.db` và khởi động lại (sẽ seed lại toàn bộ dữ liệu — chỉ nên làm khi mới deploy, chưa có dữ liệu thật).
-2. Hoặc thêm 1 trang "Đổi mật khẩu" gọi API cập nhật `password_hash` trong bảng `users` (chưa có trong bản hiện tại, có thể yêu cầu bổ sung).
+Tài khoản mặc định khi seed lần đầu là `admin` / `admin123`. Sau khi đăng nhập, bấm nút **"Đổi mật khẩu"** ở góc trên bên phải để tự đặt mật khẩu mới (yêu cầu nhập đúng mật khẩu hiện tại, mật khẩu mới tối thiểu 6 ký tự). Nên đổi ngay trước khi deploy công khai.

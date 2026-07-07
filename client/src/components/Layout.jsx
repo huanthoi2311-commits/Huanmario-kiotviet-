@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import ChangePasswordModal from "./ChangePasswordModal.jsx";
 
 const NAV_ITEMS = [
   { to: "/", label: "Tổng quan", end: true },
@@ -16,6 +18,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   return (
     <div>
@@ -23,9 +26,11 @@ export default function Layout() {
         <div className="logo">🟦 QuảnLý Bán Hàng</div>
         <div className="header-right">
           <span className="user-chip">👤 {user?.fullName}</span>
+          <button className="logout-btn" onClick={() => setPasswordModalOpen(true)}>Đổi mật khẩu</button>
           <button className="logout-btn" onClick={logout}>Đăng xuất</button>
         </div>
       </header>
+      {passwordModalOpen && <ChangePasswordModal onClose={() => setPasswordModalOpen(false)} />}
       <nav className="topnav">
         <div className="nav-links">
           {NAV_ITEMS.map((item) => (

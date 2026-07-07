@@ -1,7 +1,7 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../db.js";
-import { verifyPassword } from "../utils/password.js";
+import { hashPassword, verifyPassword } from "../utils/password.js";
 import { JWT_SECRET, requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -25,6 +25,22 @@ router.post("/login", (req, res) => {
 
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
+});
+
+router.put("/password", requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Thiếu mật khẩu hiện tại hoặc mật khẩu mới" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+  }
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!user || !verifyPassword(currentPassword, user.password_hash)) {
+    return res.status(401).json({ error: "Mật khẩu hiện tại không đúng" });
+  }
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(newPassword), user.id);
+  res.json({ ok: true });
 });
 
 export default router;
