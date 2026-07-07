@@ -35,7 +35,9 @@ router.get("/summary", (req, res) => {
     )
     .get(lastMonth.start, lastMonth.end).revenue;
 
-  const returns = db.prepare(`SELECT COUNT(*) AS c FROM orders WHERE status = 'returned'`).get().c;
+  const returns = db
+    .prepare(`SELECT COUNT(*) AS c FROM orders WHERE status = 'returned' AND date(returned_at) = date('now')`)
+    .get().c;
 
   const percentChange =
     lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;

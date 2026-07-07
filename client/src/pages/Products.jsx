@@ -52,7 +52,12 @@ export default function Products() {
 
   async function handleDelete(id) {
     if (!confirm("Xóa hàng hóa này?")) return;
-    await api.del(`/products/${id}`);
+    try {
+      await api.del(`/products/${id}`);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
     load();
   }
 

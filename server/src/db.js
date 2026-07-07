@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS orders (
   status TEXT NOT NULL DEFAULT 'completed',
   payment_status TEXT NOT NULL DEFAULT 'paid',
   total_amount REAL NOT NULL DEFAULT 0,
-  note TEXT
+  note TEXT,
+  returned_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -128,6 +129,11 @@ if (!orderItemColumns.some((c) => c.name === "cost")) {
       (SELECT cost FROM products WHERE products.id = order_items.product_id), 0
     )`
   );
+}
+
+const orderColumns = db.prepare("PRAGMA table_info(orders)").all();
+if (!orderColumns.some((c) => c.name === "returned_at")) {
+  db.exec("ALTER TABLE orders ADD COLUMN returned_at TEXT");
 }
 
 export function logActivity(type, message, refType = null, refId = null, createdAt = null) {

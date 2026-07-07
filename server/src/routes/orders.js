@@ -86,6 +86,44 @@ export function buildOrdersRouter(defaultChannel = null) {
     res.json(db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id));
   });
 
+  router.post("/:id/return", (req, res) => {
+    const order = db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id);
+    if (!order) return res.status(404).json({ error: "Không tìm thấy đơn hàng" });
+    if (order.status === "returned") {
+      return res.status(400).json({ error: "Đơn hàng này đã được trả trước đó" });
+    }
+
+    const items = db.prepare("SELECT * FROM order_items WHERE order_id = ?").all(order.id);
+    for (const it of items) {
+      db.prepare("UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?").run(it.qty, it.product_id);
+    }
+
+    if (order.payment_status === "unpaid" && order.customer_id) {
+      db.prepare("UPDATE customers SET debt_amount = MAX(debt_amount - ?, 0) WHERE id = ?").run(
+        order.total_amount,
+        order.customer_id
+      );
+    } else if (order.payment_status === "paid" && order.total_amount > 0) {
+      db.prepare(
+        "INSERT INTO cashbook_transactions (type, amount, date, description, category, method) VALUES ('out', ?, ?, ?, 'refund', 'cash')"
+      ).run(order.total_amount, new Date().toISOString(), `Hoàn tiền trả hàng đơn ${order.code}`);
+    }
+
+    const now = new Date().toISOString();
+    db.prepare("UPDATE orders SET status = 'returned', returned_at = ? WHERE id = ?").run(now, order.id);
+
+    const employee = order.employee_id ? db.prepare("SELECT name FROM employees WHERE id = ?").get(order.employee_id) : null;
+    logActivity(
+      "return",
+      `${employee?.name || "Người dùng"} vừa trả hàng đơn ${order.code} trị giá ${order.total_amount.toLocaleString("vi-VN")}`,
+      "order",
+      order.id,
+      now
+    );
+
+    res.json(db.prepare("SELECT * FROM orders WHERE id = ?").get(order.id));
+  });
+
   return router;
 }
 

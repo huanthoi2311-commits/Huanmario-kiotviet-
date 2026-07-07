@@ -51,6 +51,10 @@ router.put("/:id", (req, res) => {
 });
 
 router.delete("/:id", (req, res) => {
+  const usedInOrders = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE customer_id = ?").get(req.params.id).c;
+  if (usedInOrders > 0) {
+    return res.status(400).json({ error: "Không thể xóa khách hàng đã có lịch sử đơn hàng" });
+  }
   db.prepare("DELETE FROM customers WHERE id = ?").run(req.params.id);
   res.status(204).end();
 });

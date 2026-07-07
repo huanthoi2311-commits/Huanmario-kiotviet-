@@ -71,6 +71,17 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
     load();
   }
 
+  async function handleReturn(id) {
+    if (!confirm("Xác nhận trả hàng cho đơn này? Tồn kho sẽ được hoàn lại, công nợ hoặc tiền hoàn sẽ được cập nhật tương ứng.")) return;
+    try {
+      await api.post(`${endpoint}/${id}/return`, {});
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    load();
+  }
+
   const columns = [
     { key: "code", header: "Mã đơn" },
     { key: "date", header: "Ngày tạo", render: (r) => formatDateTime(r.date), exportValue: (r) => formatDateTime(r.date) },
@@ -86,6 +97,27 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
         </span>
       ),
       exportValue: (r) => (r.payment_status === "paid" ? "Đã thanh toán" : "Còn nợ"),
+    },
+    {
+      key: "status",
+      header: "Trạng thái",
+      render: (r) =>
+        r.status === "returned" ? (
+          <span className="badge badge-red">Đã trả hàng</span>
+        ) : (
+          <span className="badge badge-green">Hoàn tất</span>
+        ),
+      exportValue: (r) => (r.status === "returned" ? "Đã trả hàng" : "Hoàn tất"),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (r) =>
+        r.status !== "returned" && (
+          <button className="btn btn-danger btn-sm" onClick={() => handleReturn(r.id)}>
+            Trả hàng
+          </button>
+        ),
     },
   ];
 

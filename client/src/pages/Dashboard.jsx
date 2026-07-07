@@ -136,7 +136,9 @@ export default function Dashboard() {
             <div className="card-header"><h3>Hoạt động gần đây</h3></div>
             {activity.map((a) => (
               <div className="activity-item" key={a.id}>
-                <div className="dot">{a.type === "purchase" ? "📥" : a.type === "inventory" ? "📋" : "🧾"}</div>
+                <div className="dot">
+                  {a.type === "purchase" ? "📥" : a.type === "inventory" ? "📋" : a.type === "return" ? "↩️" : "🧾"}
+                </div>
                 <div>
                   <div>{a.message}</div>
                   <div className="time">{timeAgo(a.created_at)}</div>

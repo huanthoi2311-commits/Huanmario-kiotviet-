@@ -63,6 +63,13 @@ router.put("/:id", (req, res) => {
 });
 
 router.delete("/:id", (req, res) => {
+  const usedInOrders = db.prepare("SELECT COUNT(*) AS c FROM order_items WHERE product_id = ?").get(req.params.id).c;
+  const usedInPurchases = db
+    .prepare("SELECT COUNT(*) AS c FROM purchase_items WHERE product_id = ?")
+    .get(req.params.id).c;
+  if (usedInOrders > 0 || usedInPurchases > 0) {
+    return res.status(400).json({ error: "Không thể xóa hàng hóa đã có lịch sử đơn hàng hoặc nhập hàng" });
+  }
   db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
   res.status(204).end();
 });

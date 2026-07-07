@@ -46,7 +46,12 @@ export default function Customers() {
 
   async function handleDelete(id) {
     if (!confirm("Xóa khách hàng này?")) return;
-    await api.del(`/customers/${id}`);
+    try {
+      await api.del(`/customers/${id}`);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
     load();
   }
 
