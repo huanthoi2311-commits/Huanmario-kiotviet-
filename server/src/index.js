@@ -23,7 +23,7 @@ app.use(express.json());
 
 app.use(async (req, res, next) => {
   try {
-    await dbReady;
+    await dbReady();
     next();
   } catch (err) {
     console.error(err);

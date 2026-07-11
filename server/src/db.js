@@ -1,32 +1,36 @@
-import { Pool, types } from "@neondatabase/serverless";
+import { neon, types } from "@neondatabase/serverless";
 import { hashPassword } from "./utils/password.js";
 
 // COUNT(*)/SUM(int) come back as bigint (oid 20); parse as JS number since our
 // values never approach the range where that would lose precision.
 types.setTypeParser(20, (val) => parseInt(val, 10));
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Use the stateless HTTP query function rather than Pool: Pool keeps a
+// WebSocket open, which goes stale across the freeze/thaw cycles of a
+// serverless function and surfaces as random "ErrorEvent" failures on
+// warm invocations. Every call here is a single independent HTTP request,
+// which is what Neon recommends for serverless/edge runtimes.
+const sql = neon(process.env.DATABASE_URL);
 
-function toPositional(sql) {
+function toPositional(sqlText) {
   let i = 0;
-  return sql.replace(/\?/g, () => `$${++i}`);
+  return sqlText.replace(/\?/g, () => `$${++i}`);
 }
 
 export const db = {
-  prepare(sql) {
-    const text = toPositional(sql);
+  prepare(sqlText) {
+    const text = toPositional(sqlText);
     return {
       async get(...params) {
-        const res = await pool.query(text, params);
-        return res.rows[0];
+        const rows = await sql.query(text, params);
+        return rows[0];
       },
       async all(...params) {
-        const res = await pool.query(text, params);
-        return res.rows;
+        return sql.query(text, params);
       },
       async run(...params) {
-        const res = await pool.query(text, params);
-        return { lastInsertRowid: res.rows[0]?.id, changes: res.rowCount };
+        const rows = await sql.query(text, params);
+        return { lastInsertRowid: rows[0]?.id };
       },
     };
   },
@@ -156,7 +160,7 @@ const SCHEMA_STATEMENTS = [
 
 async function ensureSchema() {
   for (const statement of SCHEMA_STATEMENTS) {
-    await pool.query(statement);
+    await sql.query(statement);
   }
 }
 
@@ -400,4 +404,19 @@ async function seedIfEmpty() {
     .run(new Date(now.getTime() - 15 * 86400000).toISOString());
 }
 
-export const dbReady = ensureSchema().then(() => seedIfEmpty());
+// A rejected promise stays rejected forever, which would permanently break
+// every future request on a warm serverless instance after one transient
+// failure (e.g. a dropped connection). Reset on failure so the next request
+// gets a fresh attempt instead of being stuck replaying the same error.
+let readyPromise = null;
+export function dbReady() {
+  if (!readyPromise) {
+    readyPromise = ensureSchema()
+      .then(() => seedIfEmpty())
+      .catch((err) => {
+        readyPromise = null;
+        throw err;
+      });
+  }
+  return readyPromise;
+}
