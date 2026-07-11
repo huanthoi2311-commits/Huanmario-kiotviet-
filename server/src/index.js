@@ -23,6 +23,7 @@ import taxRoutes from "./routes/tax.js";
 export const config = { maxDuration: 30 };
 
 const app = express();
+app.set("trust proxy", true);
 app.use(cors());
 app.use(express.json());
 

@@ -156,6 +156,14 @@ const SCHEMA_STATEMENTS = [
     ref_id INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  `CREATE TABLE IF NOT EXISTS login_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    ip_address TEXT,
+    user_agent TEXT,
+    is_unusual BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
 ];
 
 async function ensureSchema() {

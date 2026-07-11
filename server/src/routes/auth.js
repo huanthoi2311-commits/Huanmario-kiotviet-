@@ -23,6 +23,18 @@ router.post(
       JWT_SECRET,
       { expiresIn: "7d" }
     );
+
+    const ip = (req.headers["x-forwarded-for"] || req.ip || "").toString().split(",")[0].trim() || null;
+    const userAgent = req.headers["user-agent"] || null;
+    const priorFromIp = ip
+      ? (await db.prepare("SELECT COUNT(*) AS c FROM login_history WHERE user_id = ? AND ip_address = ?").get(user.id, ip)).c
+      : 0;
+    const hasAnyHistory = (await db.prepare("SELECT COUNT(*) AS c FROM login_history WHERE user_id = ?").get(user.id)).c > 0;
+    const isUnusual = hasAnyHistory && priorFromIp === 0;
+    await db
+      .prepare("INSERT INTO login_history (user_id, ip_address, user_agent, is_unusual) VALUES (?, ?, ?, ?)")
+      .run(user.id, ip, userAgent, isUnusual);
+
     res.json({ token, user: { id: user.id, username: user.username, fullName: user.full_name, role: user.role } });
   })
 );
@@ -30,6 +42,21 @@ router.post(
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
+
+router.get(
+  "/login-activity",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const items = await db
+      .prepare(
+        `SELECT id, ip_address, user_agent, created_at FROM login_history
+         WHERE user_id = ? AND is_unusual = TRUE AND created_at > NOW() - INTERVAL '7 days'
+         ORDER BY created_at DESC LIMIT 10`
+      )
+      .all(req.user.id);
+    res.json({ count: items.length, items });
+  })
+);
 
 router.put(
   "/password",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import RevenueChart from "../components/RevenueChart.jsx";
-import { formatCurrency, timeAgo } from "../utils/format.js";
+import { formatCurrency, formatDateTime, timeAgo } from "../utils/format.js";
 
 export default function Dashboard() {
   const [summary, setSummary] = useState(null);
@@ -11,6 +11,8 @@ export default function Dashboard() {
   const [topCustomers, setTopCustomers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [debtors, setDebtors] = useState([]);
+  const [loginActivity, setLoginActivity] = useState({ count: 0, items: [] });
+  const [loginActivityOpen, setLoginActivityOpen] = useState(false);
 
   useEffect(() => {
     api.get("/dashboard/summary").then(setSummary);
@@ -18,6 +20,7 @@ export default function Dashboard() {
     api.get("/dashboard/top-customers?limit=10").then(setTopCustomers);
     api.get("/dashboard/activity?limit=8").then(setActivity);
     api.get("/dashboard/debtors").then(setDebtors);
+    api.get("/auth/login-activity").then(setLoginActivity);
   }, []);
 
   useEffect(() => {
@@ -123,6 +126,30 @@ export default function Dashboard() {
               <p>Vay dễ dàng, giải ngân siêu tốc</p>
             </div>
           </div>
+
+          {loginActivity.count > 0 && (
+            <div className="warning-banner">
+              <div className="warning-banner-head" onClick={() => setLoginActivityOpen((v) => !v)}>
+                <span>
+                  Có <strong>{loginActivity.count}</strong> hoạt động đăng nhập khác thường cần kiểm tra
+                </span>
+                <span className={"chevron" + (loginActivityOpen ? " open" : "")}>▾</span>
+              </div>
+              {loginActivityOpen && (
+                <ul className="warning-banner-list">
+                  {loginActivity.items.map((it) => (
+                    <li key={it.id}>
+                      <div>{formatDateTime(it.created_at)}</div>
+                      <div className="time">
+                        IP: {it.ip_address || "không xác định"}
+                        {it.user_agent ? ` · ${it.user_agent.slice(0, 60)}` : ""}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {debtors.length > 0 && (
             <div className="debtor-banner">
