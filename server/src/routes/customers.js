@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
   let sql = "SELECT * FROM customers WHERE 1=1";
   const params = [];
   if (search) {
-    sql += " AND (name LIKE ? OR phone LIKE ?)";
+    sql += " AND (name ILIKE ? OR phone ILIKE ?)";
     params.push(`%${search}%`, `%${search}%`);
   }
   sql += " ORDER BY id DESC";

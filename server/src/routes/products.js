@@ -13,7 +13,7 @@ router.get("/", async (req, res) => {
              LEFT JOIN categories c ON c.id = p.category_id WHERE 1=1`;
   const params = [];
   if (search) {
-    sql += " AND (p.name LIKE ? OR p.sku LIKE ?)";
+    sql += " AND (p.name ILIKE ? OR p.sku ILIKE ?)";
     params.push(`%${search}%`, `%${search}%`);
   }
   if (categoryId) {
