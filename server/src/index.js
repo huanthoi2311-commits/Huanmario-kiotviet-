@@ -17,6 +17,11 @@ import cashbookRoutes from "./routes/cashbook.js";
 import reportRoutes from "./routes/reports.js";
 import taxRoutes from "./routes/tax.js";
 
+// Give a cold Vercel function + a cold Neon compute (free tier suspends
+// after inactivity) enough headroom to both wake up on the same request
+// instead of racing the platform's short default timeout.
+export const config = { maxDuration: 30 };
+
 const app = express();
 app.use(cors());
 app.use(express.json());

@@ -1,33 +1,37 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
 
 const PRESUMPTIVE_TAX_RATE = 0.015; // simplified placeholder, not a substitute for real accounting advice
 
-router.get("/monthly-summary", async (req, res) => {
-  const months = Number(req.query.months) || 6;
-  const rows = await db
-    .prepare(
-      `SELECT to_char(o.date, 'YYYY-MM') AS month,
+router.get(
+  "/monthly-summary",
+  asyncHandler(async (req, res) => {
+    const months = Number(req.query.months) || 6;
+    const rows = await db
+      .prepare(
+        `SELECT to_char(o.date, 'YYYY-MM') AS month,
               COALESCE(SUM(o.total_amount), 0) AS revenue,
               COALESCE(SUM(oi.qty * oi.cost), 0) AS cost
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
        WHERE o.status = 'completed'
        GROUP BY month ORDER BY month DESC LIMIT ?`
-    )
-    .all(months);
+      )
+      .all(months);
 
-  const summary = rows.map((r) => ({
-    month: r.month,
-    revenue: r.revenue,
-    cost: r.cost,
-    grossProfit: r.revenue - r.cost,
-    estimatedTax: Math.round(r.revenue * PRESUMPTIVE_TAX_RATE),
-  }));
+    const summary = rows.map((r) => ({
+      month: r.month,
+      revenue: r.revenue,
+      cost: r.cost,
+      grossProfit: r.revenue - r.cost,
+      estimatedTax: Math.round(r.revenue * PRESUMPTIVE_TAX_RATE),
+    }));
 
-  res.json({ taxRate: PRESUMPTIVE_TAX_RATE, months: summary.reverse() });
-});
+    res.json({ taxRate: PRESUMPTIVE_TAX_RATE, months: summary.reverse() });
+  })
+);
 
 export default router;
