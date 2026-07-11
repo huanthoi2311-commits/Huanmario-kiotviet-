@@ -4,8 +4,12 @@ import DataTable from "../components/DataTable.jsx";
 import ExportButton from "../components/ExportButton.jsx";
 import { formatCurrency, formatDateTime } from "../utils/format.js";
 
+const PAGE_SIZE = 20;
+
 export default function Orders({ channel, title = "Đơn hàng", endpoint = "/orders" }) {
   const [orders, setOrders] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [customers, setCustomers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [products, setProducts] = useState([]);
@@ -15,16 +19,22 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
   const [paymentStatus, setPaymentStatus] = useState("paid");
   const [items, setItems] = useState([{ productId: "", qty: 1 }]);
 
-  function load() {
-    api.get(endpoint).then(setOrders);
+  function load(targetPage = page) {
+    api.get(`${endpoint}?page=${targetPage}&pageSize=${PAGE_SIZE}`).then((data) => {
+      setOrders(data.items);
+      setTotalCount(data.total);
+    });
   }
 
   useEffect(() => {
-    load();
     api.get("/customers").then(setCustomers);
     api.get("/employees").then(setEmployees);
     api.get("/products").then(setProducts);
   }, [endpoint]);
+
+  useEffect(load, [endpoint, page]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   function openCreate() {
     setCustomerId("");
@@ -68,7 +78,8 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
       items: validItems,
     });
     setModalOpen(false);
-    load();
+    setPage(1);
+    load(1);
   }
 
   async function handleReturn(id) {
@@ -79,7 +90,7 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
       alert(err.message);
       return;
     }
-    load();
+    load(page);
   }
 
   const columns = [
@@ -127,13 +138,30 @@ export default function Orders({ channel, title = "Đơn hàng", endpoint = "/or
       <div className="toolbar">
         <div />
         <div style={{ display: "flex", gap: 10 }}>
-          <ExportButton filename={endpoint.replace("/", "") || "don-hang"} columns={columns} rows={orders} />
+          <ExportButton
+            filename={endpoint.replace("/", "") || "don-hang"}
+            columns={columns}
+            fetchRows={() => api.get(`${endpoint}?all=1`).then((data) => data.items)}
+          />
           <button className="btn btn-primary" onClick={openCreate}>+ Tạo đơn hàng</button>
         </div>
       </div>
       <div className="card">
         <DataTable columns={columns} rows={orders} emptyText="Chưa có đơn hàng nào" />
       </div>
+      {totalCount > 0 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginTop: 16 }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            ‹ Trước
+          </button>
+          <span>
+            Trang {page}/{totalPages} ({totalCount} đơn)
+          </span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Sau ›
+          </button>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>

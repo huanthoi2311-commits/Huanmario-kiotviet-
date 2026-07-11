@@ -6,17 +6,33 @@ export function buildOrdersRouter(defaultChannel = null) {
 
   router.get("/", async (req, res) => {
     const channel = defaultChannel || req.query.channel;
-    let sql = `SELECT o.*, c.name AS "customerName", e.name AS "employeeName"
-               FROM orders o
+    let whereSql = `FROM orders o
                LEFT JOIN customers c ON c.id = o.customer_id
                LEFT JOIN employees e ON e.id = o.employee_id WHERE 1=1`;
     const params = [];
     if (channel) {
-      sql += " AND o.channel = ?";
+      whereSql += " AND o.channel = ?";
       params.push(channel);
     }
-    sql += " ORDER BY o.date DESC";
-    res.json(await db.prepare(sql).all(...params));
+
+    if (req.query.all === "1") {
+      const items = await db
+        .prepare(`SELECT o.*, c.name AS "customerName", e.name AS "employeeName" ${whereSql} ORDER BY o.date DESC`)
+        .all(...params);
+      return res.json({ items, total: items.length });
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+    const total = (await db.prepare(`SELECT COUNT(*) AS c ${whereSql}`).get(...params)).c;
+    const items = await db
+      .prepare(
+        `SELECT o.*, c.name AS "customerName", e.name AS "employeeName" ${whereSql}
+         ORDER BY o.date DESC LIMIT ? OFFSET ?`
+      )
+      .all(...params, pageSize, (page - 1) * pageSize);
+
+    res.json({ items, total, page, pageSize });
   });
 
   router.get("/:id", async (req, res) => {
